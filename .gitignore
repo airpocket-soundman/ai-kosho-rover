@@ -1,0 +1,22 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# Household observations and experiment data
+data/
+recordings/
+captures/
+logs/
+models/
+
+# Local build artifacts
+.pio/
+build/
+dist/
+__pycache__/
+*.pyc
+.venv/
+.vscode/
