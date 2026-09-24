@@ -202,15 +202,23 @@ function synthesize(text, tempo=1, gain=0.5, sr=44100) {
 
 function codeToJa(text) {
   let words; try { words = parseCode(text); } catch(e) { return e.message; }
-  const out = []; let q = false;
+  const out = []; let q = false, k = false;
   for (const w of words) {
+    if (w.k) k = true;
     if (w.syl.length) {
       const key = w.syl.map(s=>s.shape+s.reg).join("");
       if (w.syl[w.syl.length-1].long) q = true;
       out.push(CODE2JA[key] || ("[" + w.syl.map(s=>s.shape+s.reg).join(" ") + "]"));
     }
   }
-  return out.join("、") + (q ? "?" : "。");
+  return finishJa(out, q, k);
+}
+
+// 文末: 問いかけは「?」(訳がすでに ? で終わるなら付けない)、息(K)があれば「。」、なければ独り言として「…」
+function finishJa(parts, q, k) {
+  const body = parts.join("、");
+  if (q) return /\?$/.test(body) ? body : body + "?";
+  return body + (k ? "。" : "…");
 }
 
 // ===== 解読器 =====
@@ -326,7 +334,7 @@ class Decoder {
     if (cur.length) words.push(cur);
     const q = syls.filter(s=>!s.k).slice(-1)[0]?.long === true;
     const code = words.map(w=>w.map(s=>s.shape+s.reg).join(" ")).join(" / ") + (syls.some(s=>s.k) ? " / K" : "");
-    const ja = words.map(w=>{ const key=w.map(s=>s.shape+s.reg).join(""); return CODE2JA[key] || ("["+w.map(s=>s.shape+s.reg).join(" ")+"]"); }).join("、") + (q ? "?" : "。");
+    const ja = finishJa(words.map(w=>{ const key=w.map(s=>s.shape+s.reg).join(""); return CODE2JA[key] || ("["+w.map(s=>s.shape+s.reg).join(" ")+"]"); }), q, syls.some(s=>s.k));
     this.onSentence({code, ja});
   }
 }
