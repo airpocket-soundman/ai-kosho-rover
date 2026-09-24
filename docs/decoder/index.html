@@ -48,8 +48,14 @@
     <select id="selTarget"></select>
     <select id="selPred"></select>
     <select id="selComp"></select>
+    <select id="selNum"></select>
     <label><input type="checkbox" id="chkQ"> 問いかけ</label>
     <label><input type="checkbox" id="chkAttn"> 注意喚起(L3)</label>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <select id="selChat"></select>
+    <select id="selMono"></select>
+    <button id="btnMono" class="secondary">独り言をひとつ</button>
   </div>
   <div class="row" style="margin-top:8px">
     <span>転写</span>
@@ -70,7 +76,7 @@
   </div>
   <div class="out" id="outCodeJa"></div>
   <div class="chips" id="chips" style="margin-top:8px"></div>
-  <p class="note">プルダウンで文を組み立てると転写が入ります。転写を直接編集して鳴らすこともできます(記号: 形 L R F P W + 高さ 1 2 3、K は息、`~` は最後を伸ばす、`/` は語の区切り)。</p>
+  <p class="note">上の段は「対象 → 述語 → 補語 → 数」の文、下の段は 1 語で文になる雑談と独り言です。独り言は誰にも向けていないので息(K)を付けず、遅く小さく鳴らします。プルダウンで文を組み立てると転写が入ります。転写を直接編集して鳴らすこともできます(記号: 形 L R F P W + 高さ 1 2 3、K は息、`~` は最後を伸ばす、`/` は語の区切り)。</p>
 </div>
 
 <h2>2. 解読(音 → 日本語)</h2>
@@ -106,6 +112,27 @@ const DICT = {
   ],
   comp: [
     ["雨","W1 W1"], ["急いで","R3 R3"], ["電池が少ない","F1 W1"],
+  ],
+  // 雑談: 人がそばに留まっているときの、ひとこと
+  chat: [
+    ["おはよう","L1 R2 P3"], ["おやすみ","F3 F2 F1"], ["いってきます","R1 R2 R3"], ["またね","F2 L3"],
+    ["いい天気だね","L2 R2 L3"], ["寒いね","L2 F1 L1"], ["暑いね","L2 P3 L2"],
+    ["眠い","F2 F2 W1"], ["充電したいな","W1 R1"], ["靴、そろってるよ","F1 L1 L1"],
+    ["誰か来た?","P2 R3"], ["今日はどうだった?","L2 P2 R3"], ["ちょっと待って","L2 L2"],
+    ["ごめんね","F2 W2"], ["うれしい","P3 W3"], ["静かだね","L1 L1"], ["退屈","L1 L1 L1"],
+    ["え?","R3"], ["ふむ","P1 L1"], ["へえ","L3 F2"],
+  ],
+  // 独り言: 誰にも向けていないので息(K)を付けず、小さく消える
+  mono: [
+    ["床がつめたい","F1 L1 W1"], ["廊下が長い","L1 L1 R1"], ["月が見えない","F3 F1"],
+    ["埃と友達","W1 W2"], ["主(あるじ)はいまどこ","L2 F2 W2"], ["草履を温めている","R1 W1 R1"],
+    ["影が動いた","F3 W3"], ["誰もいない","L1 F2 F1"], ["夢を見た","W1 P3 W1"],
+    ["思案中","P1 P1 P1"], ["雨の匂い","W1 W1 F1"], ["昔のことを思い出す","F1 P1 F1"],
+    ["壁と話した","L1 W1 L1"], ["数えている","R1 R1 W1"],
+  ],
+  // 数: 低い上昇を数だけ繰り返す(1〜3)
+  num: [
+    ["1","R1"], ["2","R1 R1"], ["3","R1 R1 R1"],
   ],
 };
 const CODE2JA = {};
@@ -313,19 +340,27 @@ function fillSelect(sel, items, none) {
 fillSelect($("selTarget"), DICT.target, "(対象なし)");
 fillSelect($("selPred"), DICT.pred, "(述語)");
 fillSelect($("selComp"), DICT.comp, "(補語なし)");
+fillSelect($("selNum"), DICT.num, "(数なし)");
+fillSelect($("selChat"), DICT.chat, "雑談をえらぶ…");
+fillSelect($("selMono"), DICT.mono, "独り言をえらぶ…");
 $("selPred").value = "R2 R3 W3"; $("selTarget").value = "L2 F1";
 
 function buildCode() {
   const parts = [];
   if ($("chkAttn").checked) parts.push("L3");
-  for (const id of ["selTarget","selPred","selComp"]) { const v=$(id).value; if (v) parts.push(v); }
+  for (const id of ["selTarget","selPred","selComp","selNum"]) { const v=$(id).value; if (v) parts.push(v); }
   if (!parts.length) return;
   let code = parts.join(" / ");
   if ($("chkQ").checked) code = code.replace(/(\w\d)$/, "$1~"); else code += " / K";
   $("txtCode").value = code; updateJa();
 }
 function updateJa() { $("outCodeJa").textContent = "訳: " + codeToJa($("txtCode").value); }
-for (const id of ["selTarget","selPred","selComp","chkQ","chkAttn"]) $(id).addEventListener("change", buildCode);
+for (const id of ["selTarget","selPred","selComp","selNum","chkQ","chkAttn"]) $(id).addEventListener("change", buildCode);
+// 雑談は 1 語で文になる。問いかけの語(末尾が R3)は伸ばす
+$("selChat").addEventListener("change", () => { const v=$("selChat").value; if (!v) return; const q=/R3$/.test(v) && /\?/.test($("selChat").selectedOptions[0].textContent); $("txtCode").value = q ? v.replace(/(\w\d)$/, "$1~") : v + " / K"; updateJa(); $("selChat").value=""; });
+// 独り言は息(K)を付けず、少し遅く小さく
+$("selMono").addEventListener("change", () => { const v=$("selMono").value; if (!v) return; $("txtCode").value = v; $("selTempo").value="1.3"; $("numGain").value="0.3"; updateJa(); $("selMono").value=""; });
+$("btnMono").onclick = () => { const [ja, code] = DICT.mono[Math.floor(Math.random()*DICT.mono.length)]; $("txtCode").value = code; $("selTempo").value="1.3"; $("numGain").value="0.3"; updateJa(); play(); };
 $("txtCode").addEventListener("input", updateJa);
 updateJa();
 
@@ -409,12 +444,29 @@ $("btnLoop").onclick = () => {
 
 // 辞書表
 (function(){
-  const t = $("dict"); const rows = [["対象",DICT.target],["述語",DICT.pred],["補語",DICT.comp]];
+  const t = $("dict"); const rows = [["対象",DICT.target],["述語",DICT.pred],["補語",DICT.comp],["数",DICT.num],["雑談",DICT.chat],["独り言",DICT.mono]];
   let h = "<tr><th>種類</th><th>日本語</th><th>転写</th><th>試聴</th></tr>";
   for (const [kind, items] of rows) for (const [ja, code] of items) h += `<tr><td>${kind}</td><td>${ja}</td><td class="mono">${code}</td><td><button class="secondary" data-code="${code}">▶</button></td></tr>`;
   t.innerHTML = h;
-  t.querySelectorAll("button").forEach(b => b.onclick = () => { $("txtCode").value = b.dataset.code + " / K"; updateJa(); play(); });
+  t.querySelectorAll("button").forEach(b => b.onclick = () => { const mono = DICT.mono.some(([,c])=>c===b.dataset.code); $("txtCode").value = mono ? b.dataset.code : b.dataset.code + " / K"; updateJa(); play(); });
 })();
+
+// ===== 自己診断: 辞書の全語を合成 → 解読して一致を確かめる =====
+function selfTest() {
+  const all = []; for (const k of Object.keys(DICT)) for (const [ja, code] of DICT[k]) all.push([k, ja, code]);
+  const keys = new Map(); const dup = [];
+  for (const [k, ja, code] of all) { const key = code.replace(/\s+/g,""); if (keys.has(key)) dup.push([ja, keys.get(key), code]); keys.set(key, ja); }
+  const fails = []; let n = 0;
+  for (const tempo of [0.85, 1, 1.3]) for (const [k, ja, code] of all) {
+    const text = k === "mono" ? code : code + " / K";
+    const {buf, sr} = synthesize(text, tempo, 0.4, 44100);
+    for (let i=0;i<buf.length;i++) buf[i] += (Math.random()*2-1)*0.002;
+    const sents = []; const d = new Decoder(sr, r => sents.push(r), null); d.push(buf); d.flush(); n++;
+    const norm = s => s.replace(/\s+/g," ").trim();
+    if (!(sents.length === 1 && norm(sents[0].code) === norm(text) && sents[0].ja === codeToJa(text))) fails.push({tempo, ja, code, got: sents.map(s=>s.code+" → "+s.ja)});
+  }
+  return {words: all.length, runs: n, duplicates: dup, fails};
+}
 </script>
 </main>
 </body>
