@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>小姓語 デコーダー / 合成器</title>
+<style>
+  :root { --bg:#fafafa; --fg:#222; --muted:#666; --line:#ddd; --acc:#b23a3a; --acc2:#2a6db0; --card:#fff; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161616; --fg:#eee; --muted:#aaa; --line:#333; --card:#1f1f1f; } }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--fg); font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif; line-height:1.6; }
+  main { max-width: 900px; margin: 0 auto; }
+  h1 { font-size:1.4rem; margin:0 0 4px; }
+  h2 { font-size:1.1rem; margin:24px 0 8px; border-bottom:1px solid var(--line); padding-bottom:4px; }
+  p.lead { color:var(--muted); margin:0 0 12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:12px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  select, input[type=text], input[type=number] { font-size:1rem; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--fg); }
+  input[type=text] { flex:1; min-width: 220px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  button { font-size:1rem; padding:7px 14px; border-radius:6px; border:1px solid var(--acc); background:var(--acc); color:#fff; cursor:pointer; }
+  button.secondary { background:transparent; color:var(--acc); }
+  button.blue { background:var(--acc2); border-color:var(--acc2); }
+  button:disabled { opacity:.5; cursor:default; }
+  .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .out { min-height: 2.2em; padding:8px; border:1px dashed var(--line); border-radius:6px; margin-top:8px; white-space:pre-wrap; }
+  .big { font-size:1.3rem; }
+  table { border-collapse:collapse; width:100%; font-size:.95rem; }
+  th, td { border-bottom:1px solid var(--line); padding:4px 6px; text-align:left; vertical-align:top; }
+  th { color:var(--muted); font-weight:600; }
+  canvas { width:100%; height:110px; background:var(--card); border:1px solid var(--line); border-radius:6px; display:block; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { border:1px solid var(--line); border-radius:999px; padding:2px 10px; cursor:pointer; background:var(--card); font-size:.9rem; }
+  .chip:hover { border-color:var(--acc); }
+  .note { color:var(--muted); font-size:.9rem; }
+  .log { max-height: 260px; overflow:auto; font-size:.95rem; }
+  .log div { border-bottom:1px solid var(--line); padding:4px 0; }
+  .tag { display:inline-block; font-size:.75rem; padding:0 6px; border-radius:4px; background:var(--line); margin-right:6px; }
+</style>
+</head>
+<body>
+<main>
+<h1>小姓語 デコーダー / 合成器</h1>
+<p class="lead">AI小姓ローバーが話す電子音の言語を、音にしたり日本語に戻したりします。仕様は <a href="../language/">小姓語</a> のページにあります。</p>
+
+<h2>1. 合成(日本語 → 音)</h2>
+<div class="card">
+  <div class="row">
+    <select id="selTarget"></select>
+    <select id="selPred"></select>
+    <select id="selComp"></select>
+    <label><input type="checkbox" id="chkQ"> 問いかけ</label>
+    <label><input type="checkbox" id="chkAttn"> 注意喚起(L3)</label>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <span>転写</span>
+    <input type="text" id="txtCode" value="L2 F1 / R2 R3 W3 / K" spellcheck="false">
+  </div>
+  <div class="row" style="margin-top:8px">
+    <label>テンポ
+      <select id="selTempo">
+        <option value="0.85">嬉しい(0.85)</option>
+        <option value="1" selected>通常(1.0)</option>
+        <option value="1.3">困っている(1.3)</option>
+      </select>
+    </label>
+    <label>音量 <input type="number" id="numGain" value="0.5" min="0.05" max="1" step="0.05" style="width:5em"></label>
+    <button id="btnPlay">再生</button>
+    <button id="btnWav" class="secondary">WAV 書き出し</button>
+    <button id="btnLoop" class="blue">ループバック解読</button>
+  </div>
+  <div class="out" id="outCodeJa"></div>
+  <div class="chips" id="chips" style="margin-top:8px"></div>
+  <p class="note">プルダウンで文を組み立てると転写が入ります。転写を直接編集して鳴らすこともできます(記号: 形 L R F P W + 高さ 1 2 3、K は息、`~` は最後を伸ばす、`/` は語の区切り)。</p>
+</div>
+
+<h2>2. 解読(音 → 日本語)</h2>
+<div class="card">
+  <div class="row">
+    <button id="btnMic">マイクで聞く</button>
+    <button id="btnStop" class="secondary" disabled>停止</button>
+    <span class="note" id="micState">待機中</span>
+  </div>
+  <canvas id="cv" width="900" height="110"></canvas>
+  <div class="out big" id="outDecoded">(ここに訳が出ます)</div>
+  <div class="log" id="log"></div>
+  <p class="note">静かな場所で、スピーカーから 50 cm 以内で聞かせてください。解析は 400〜4,000 Hz の純音を前提にしています。</p>
+</div>
+
+<h2>3. 辞書</h2>
+<div class="card">
+  <table id="dict"></table>
+</div>
+
+<script>
+// ===== 辞書(正本) =====
+const DICT = {
+  target: [
+    ["お父さん","L2 F1"], ["お母さん","L2 R2"], ["子ども","L2 P3"], ["みんな","L2 W2"],
+    ["わたし","L1"], ["台","F2 L2"], ["扉","P2 P2"], ["傘","W1 R2"],
+  ],
+  pred: [
+    ["持ってきたよ","R2 R3 W3"], ["おかえり","F3 F2"], ["いってらっしゃい","R2 R3 L3"],
+    ["見に行くね","P1 R3"], ["迷っている","W2"], ["あっ","F1"], ["帰るね","F2 F1"],
+    ["ただいま","P1"], ["充電中","W1"], ["待ってるね","L2"], ["ありがとう","R1 P2"],
+    ["了解","R2"], ["できない","F1 F1"], ["どいて、危ない","P3 P3 P3"],
+  ],
+  comp: [
+    ["雨","W1 W1"], ["急いで","R3 R3"], ["電池が少ない","F1 W1"],
+  ],
+};
+const CODE2JA = {};
+for (const k of Object.keys(DICT)) for (const [ja, code] of DICT[k]) CODE2JA[code.replace(/\s+/g,"")] = ja;
+CODE2JA["L3"] = "(ねえ)";
+
+// ===== 音の定義 =====
+const CENTER = {1:650, 2:1300, 3:2600};
+const SYL = 0.120, GAP_SYL = 0.040, GAP_WORD = 0.160, LONG = 0.300, K_LEN = 0.030;
+
+function parseCode(text) {
+  // 返り値: 語の配列。語 = { syl:[{shape,reg,long}], k:bool }
+  const words = [];
+  for (const raw of text.split("/")) {
+    const w = raw.trim(); if (!w) continue;
+    const syl = []; let k = false;
+    for (const tok of w.split(/\s+/)) {
+      if (!tok) continue;
+      if (tok.toUpperCase() === "K") { k = true; continue; }
+      const m = tok.match(/^([LRFPW])([123])(~?)$/i);
+      if (!m) throw new Error("転写が読めません: " + tok);
+      syl.push({shape:m[1].toUpperCase(), reg:+m[2], long: m[3] === "~"});
+    }
+    if (syl.length || k) words.push({syl, k});
+  }
+  return words;
+}
+
+function synthesize(text, tempo=1, gain=0.5, sr=44100) {
+  const words = parseCode(text);
+  const parts = [];  // {t0, dur, fn}
+  let t = 0.05;
+  words.forEach((w, wi) => {
+    w.syl.forEach((s, si) => {
+      const dur = (s.long ? LONG : SYL) * tempo;
+      parts.push({t0:t, dur, s});
+      t += dur + (si < w.syl.length-1 ? GAP_SYL*tempo : 0);
+    });
+    if (w.k) { if (w.syl.length) t += GAP_WORD*tempo; parts.push({t0:t, dur:K_LEN, s:{shape:"K"}}); t += K_LEN; }
+    if (wi < words.length-1) t += GAP_WORD*tempo;
+  });
+  t += 0.15;
+  const n = Math.ceil(t*sr), buf = new Float32Array(n);
+  for (const p of parts) {
+    const i0 = Math.floor(p.t0*sr), len = Math.floor(p.dur*sr);
+    if (p.s.shape === "K") {
+      for (let i=0;i<len;i++) { const u=i/len; const env=Math.sin(Math.PI*u); buf[i0+i] += (Math.random()*2-1)*gain*0.6*env; }
+      continue;
+    }
+    const f0 = CENTER[p.s.reg]; let ph = 0;
+    for (let i=0;i<len;i++) {
+      const u = i/len; let f;
+      switch (p.s.shape) {
+        case "L": f = f0; break;
+        case "R": f = f0 * Math.pow(1.5, u-0.5); break;
+        case "F": f = f0 * Math.pow(1.5, 0.5-u); break;
+        case "P": f = f0 * Math.pow(1.3, Math.sin(Math.PI*u)); break;
+        case "W": f = f0 * (1 + 0.08*Math.sin(2*Math.PI*20*(i/sr))); break;
+      }
+      ph += 2*Math.PI*f/sr;
+      const a = Math.min(1, i/(0.008*sr), (len-i)/(0.015*sr));
+      buf[i0+i] += gain * a * (Math.sin(ph) + 0.25*Math.sin(2*ph)) / 1.25;
+    }
+  }
+  return {buf, sr};
+}
+
+function codeToJa(text) {
+  let words; try { words = parseCode(text); } catch(e) { return e.message; }
+  const out = []; let q = false;
+  for (const w of words) {
+    if (w.syl.length) {
+      const key = w.syl.map(s=>s.shape+s.reg).join("");
+      if (w.syl[w.syl.length-1].long) q = true;
+      out.push(CODE2JA[key] || ("[" + w.syl.map(s=>s.shape+s.reg).join(" ") + "]"));
+    }
+  }
+  return out.join("、") + (q ? "?" : "。");
+}
+
+// ===== 解読器 =====
+// FFT(実数入力、radix-2)
+function fft(re, im) {
+  const n = re.length;
+  for (let i=1,j=0;i<n;i++){ let bit=n>>1; for(;j&bit;bit>>=1) j^=bit; j^=bit; if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]];} }
+  for (let len=2;len<=n;len<<=1){ const ang=-2*Math.PI/len, wr=Math.cos(ang), wi=Math.sin(ang);
+    for(let i=0;i<n;i+=len){ let cr=1,ci=0; for(let k=0;k<len/2;k++){ const a=i+k,b=a+len/2; const tr=re[b]*cr-im[b]*ci, ti=re[b]*ci+im[b]*cr; re[b]=re[a]-tr; im[b]=im[a]-ti; re[a]+=tr; im[a]+=ti; const ncr=cr*wr-ci*wi; ci=cr*wi+ci*wr; cr=ncr; } } }
+}
+
+class Decoder {
+  constructor(sr, onSentence, onFrame) {
+    this.sr = sr; this.N = 1024; this.hop = 128; this.onSentence = onSentence; this.onFrame = onFrame;
+    this.carry = new Float32Array(0); this.frame = 0;
+    this.re = new Float32Array(this.N); this.im = new Float32Array(this.N);
+    this.win = new Float32Array(this.N).map((_,i)=>0.5-0.5*Math.cos(2*Math.PI*i/this.N));
+    this.noise = 1e-4;              // 雑音床(RMS)
+    this.cur = null;                // 進行中の音節 {start, frames:[{f, noise}], peak}
+    this.debug = [];
+    this.silence = 0;               // 無音フレーム数
+    this.syls = [];                 // 文の中の音節 {t0, t1, reg, shape, k}
+    this.lastEnd = -1;
+    this.fmin = 400; this.fmax = 4000;
+  }
+  push(samples) {
+    const all = new Float32Array(this.carry.length + samples.length);
+    all.set(this.carry); all.set(samples, this.carry.length);
+    let i = 0;
+    for (; i + this.N <= all.length; i += this.hop) this.analyze(all.subarray(i, i+this.N));
+    this.carry = all.slice(i);
+  }
+  flush() { this.push(new Float32Array(this.N*2)); this.endSyllable(); this.endSentence(); }
+  analyze(x) {
+    const N=this.N, sr=this.sr, re=this.re, im=this.im;
+    let rms=0; for(let i=0;i<N;i++){ re[i]=x[i]*this.win[i]; im[i]=0; rms+=x[i]*x[i]; } rms=Math.sqrt(rms/N);
+    fft(re, im);
+    const b0=Math.floor(this.fmin*N/sr), b1=Math.ceil(this.fmax*N/sr);
+    let best=b0, bmag=0, sum=0, logsum=0, cnt=0;
+    for(let b=b0;b<=b1;b++){ const m=Math.hypot(re[b],im[b]); if(m>bmag){bmag=m;best=b;} sum+=m; logsum+=Math.log(m+1e-9); cnt++; }
+    const flat = Math.exp(logsum/cnt) / (sum/cnt + 1e-12);   // 1 に近いほど雑音
+    // 放物線補間
+    const m0=Math.hypot(re[best-1],im[best-1]), m1=bmag, m2=Math.hypot(re[best+1],im[best+1]);
+    const d = (m0-m2)/(2*(m0-2*m1+m2) || 1);
+    const f = (best + (isFinite(d)?d:0)) * sr / N;
+    const peakiness = bmag / (sum/cnt + 1e-12);
+    // 音節の中では、そのピークの 12 % 未満を無音とみなす(隣の音節との重なりを切る)
+    const floor = Math.max(0.003, this.noise*4, this.cur ? this.cur.peak*0.12 : 0);
+    const loud = rms > floor;
+    const tone = loud && peakiness > 6;
+    const noisy = loud && !tone && flat > 0.35;
+    const t = this.frame * this.hop / sr; this.frame++;
+    if (!(tone || noisy)) this.noise = this.noise*0.995 + rms*0.005;   // 雑音床の追従
+    if (this.onFrame) this.onFrame({t, f: tone ? f : null, noisy, rms});
+    if (tone || noisy) {
+      if (!this.cur) this.cur = {start:t, frames:[], peak:0};
+      this.cur.peak = Math.max(this.cur.peak, rms);
+      this.cur.frames.push({f: tone ? f : null, noisy});
+      this.silence = 0;
+    } else {
+      this.silence++;
+      if (this.cur && this.silence * this.hop / sr >= 0.008) this.endSyllable();
+      if (!this.cur && this.syls.length && (t - this.lastEnd) > 0.4) this.endSentence();
+    }
+  }
+  endSyllable() {
+    const c = this.cur; if (!c) return; this.cur = null;
+    const dur = c.frames.length * this.hop / this.sr;
+    const noisyN = c.frames.filter(fr=>fr.noisy).length;
+    const t1 = c.start + dur;
+    if (noisyN > c.frames.length*0.6) {
+      if (dur >= 0.012 && dur <= 0.12) { this.syls.push({t0:c.start, t1, k:true}); this.lastEnd = t1; this.endSentence(); }
+      return;
+    }
+    if (dur < 0.06 || dur > 0.45) return;
+    const fs = c.frames.filter(fr=>fr.f).map(fr=>Math.log2(fr.f));
+    if (fs.length < 4) return;
+    const sorted = [...fs].sort((a,b)=>a-b), med = sorted[Math.floor(sorted.length/2)];
+    let reg = 1, bestd = 1e9;
+    for (const r of [1,2,3]) { const d = Math.abs(med - Math.log2(CENTER[r])); if (d < bestd) { bestd = d; reg = r; } }
+    const n = fs.length, third = Math.max(1, Math.floor(n/3));
+    const mean = a => a.reduce((s,v)=>s+v,0)/a.length;
+    const a = mean(fs.slice(0,third)), b = mean(fs.slice(third, n-third)), cc = mean(fs.slice(n-third));
+    // 直線を引いた残差(揺れ)
+    const xs = fs.map((_,i)=>i), mx = mean(xs), my = mean(fs);
+    let sxy=0, sxx=0; for (let i=0;i<n;i++){ sxy+=(xs[i]-mx)*(fs[i]-my); sxx+=(xs[i]-mx)**2; }
+    const slope = sxy/(sxx||1);
+    const resid = fs.map((v,i)=>v-(my+slope*(i-mx)));
+    // 残差の符号反転を数える(±0.02 のヒステリシス付き)
+    let zc=0, lastSign=0; for (let i=0;i<n;i++) { if (Math.abs(resid[i]) <= 0.02) continue; const sg=Math.sign(resid[i]); if (lastSign && sg !== lastSign) zc++; lastSign = sg; }
+    const rstd = Math.sqrt(mean(resid.map(v=>v*v)));
+    let shape = "L";
+    const peak = b - (a+cc)/2;
+    if (rstd > 0.04 && zc/dur >= 25) shape = "W";        // 20 Hz の揺れなら 40 回/秒、山(P)は 17 回/秒
+    else if (peak > 0.15) shape = "P";
+    else if (cc - a > 0.22) shape = "R";
+    else if (a - cc > 0.22) shape = "F";
+    this.debug.push({dur:+dur.toFixed(3), reg, shape, a:+a.toFixed(3), b:+b.toFixed(3), c:+cc.toFixed(3), rstd:+rstd.toFixed(3), zc, n});
+    this.syls.push({t0:c.start, t1, reg, shape, long: dur >= 0.24});
+    this.lastEnd = t1;
+  }
+  endSentence() {
+    if (!this.syls.length) return;
+    const syls = this.syls; this.syls = [];
+    // 語に分ける
+    const words = []; let cur = [];
+    for (let i=0;i<syls.length;i++) {
+      const s = syls[i];
+      if (s.k) { if (cur.length) words.push(cur); cur = []; continue; }
+      if (cur.length && s.t0 - cur[cur.length-1].t1 >= 0.10) { words.push(cur); cur = []; }
+      cur.push(s);
+    }
+    if (cur.length) words.push(cur);
+    const q = syls.filter(s=>!s.k).slice(-1)[0]?.long === true;
+    const code = words.map(w=>w.map(s=>s.shape+s.reg).join(" ")).join(" / ") + (syls.some(s=>s.k) ? " / K" : "");
+    const ja = words.map(w=>{ const key=w.map(s=>s.shape+s.reg).join(""); return CODE2JA[key] || ("["+w.map(s=>s.shape+s.reg).join(" ")+"]"); }).join("、") + (q ? "?" : "。");
+    this.onSentence({code, ja});
+  }
+}
+
+// ===== UI =====
+const $ = id => document.getElementById(id);
+function fillSelect(sel, items, none) {
+  sel.innerHTML = ""; const o = document.createElement("option"); o.value=""; o.textContent=none; sel.appendChild(o);
+  for (const [ja, code] of items) { const op=document.createElement("option"); op.value=code; op.textContent=ja+"  "+code; sel.appendChild(op); }
+}
+fillSelect($("selTarget"), DICT.target, "(対象なし)");
+fillSelect($("selPred"), DICT.pred, "(述語)");
+fillSelect($("selComp"), DICT.comp, "(補語なし)");
+$("selPred").value = "R2 R3 W3"; $("selTarget").value = "L2 F1";
+
+function buildCode() {
+  const parts = [];
+  if ($("chkAttn").checked) parts.push("L3");
+  for (const id of ["selTarget","selPred","selComp"]) { const v=$(id).value; if (v) parts.push(v); }
+  if (!parts.length) return;
+  let code = parts.join(" / ");
+  if ($("chkQ").checked) code = code.replace(/(\w\d)$/, "$1~"); else code += " / K";
+  $("txtCode").value = code; updateJa();
+}
+function updateJa() { $("outCodeJa").textContent = "訳: " + codeToJa($("txtCode").value); }
+for (const id of ["selTarget","selPred","selComp","chkQ","chkAttn"]) $(id).addEventListener("change", buildCode);
+$("txtCode").addEventListener("input", updateJa);
+updateJa();
+
+// 例文チップ
+const EXAMPLES = [
+  ["持ってきたよ","L2 F1 / R2 R3 W3 / K"], ["おかえり","L2 R2 / F3 F2 / K"],
+  ["雨の見送り","R2 R3 L3 / W1 W1 / W1 R2 / K"], ["見に行くね?","P1 R3~"],
+  ["電池少ない","F1 W1 / F2 F1 / K"], ["あっ","F1 / K"], ["ただいま","P1 / K"], ["ありがとう","R1 P2 / K"],
+];
+for (const [label, code] of EXAMPLES) { const c=document.createElement("span"); c.className="chip"; c.textContent=label; c.onclick=()=>{ $("txtCode").value=code; updateJa(); play(); }; $("chips").appendChild(c); }
+
+let actx = null;
+function ctx() { if (!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); if (actx.state==="suspended") actx.resume(); return actx; }
+function play() {
+  try {
+    const {buf, sr} = synthesize($("txtCode").value, +$("selTempo").value, +$("numGain").value, ctx().sampleRate);
+    const ab = ctx().createBuffer(1, buf.length, sr); ab.copyToChannel(buf, 0);
+    const src = ctx().createBufferSource(); src.buffer = ab; src.connect(ctx().destination); src.start();
+  } catch(e) { $("outCodeJa").textContent = e.message; }
+}
+$("btnPlay").onclick = play;
+$("btnWav").onclick = () => {
+  try {
+    const {buf, sr} = synthesize($("txtCode").value, +$("selTempo").value, +$("numGain").value, 44100);
+    const n = buf.length, ab = new ArrayBuffer(44 + n*2), v = new DataView(ab);
+    const ws = (o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i, s.charCodeAt(i)); };
+    ws(0,"RIFF"); v.setUint32(4, 36+n*2, true); ws(8,"WAVE"); ws(12,"fmt "); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+    v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); ws(36,"data"); v.setUint32(40,n*2,true);
+    for (let i=0;i<n;i++) v.setInt16(44+i*2, Math.max(-1,Math.min(1,buf[i]))*32767, true);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([ab],{type:"audio/wav"}));
+    a.download = "kosho_" + $("txtCode").value.replace(/[^A-Za-z0-9]+/g,"_").replace(/^_|_$/g,"") + ".wav"; a.click();
+  } catch(e) { $("outCodeJa").textContent = e.message; }
+};
+
+// ===== 解読 UI =====
+const cv = $("cv"), g = cv.getContext("2d");
+const trace = [];  // {t, f, noisy}
+function draw() {
+  g.clearRect(0,0,cv.width,cv.height);
+  g.strokeStyle = "#888"; g.lineWidth = 1;
+  for (const r of [1,2,3]) { const y = fy(CENTER[r]); g.beginPath(); g.moveTo(0,y); g.lineTo(cv.width,y); g.stroke(); g.fillStyle="#888"; g.font="12px sans-serif"; g.fillText(r, 4, y-2); }
+  const tNow = trace.length ? trace[trace.length-1].t : 0;
+  for (const p of trace) {
+    const x = cv.width - (tNow - p.t) * 150; if (x < 0) continue;
+    if (p.noisy) { g.fillStyle = "#e0a000"; g.fillRect(x-1, 0, 2, cv.height); }
+    else if (p.f) { g.fillStyle = "#b23a3a"; g.fillRect(x-1, fy(p.f)-2, 3, 4); }
+  }
+}
+function fy(f) { const lo=Math.log2(400), hi=Math.log2(4000); return cv.height - (Math.log2(f)-lo)/(hi-lo)*cv.height; }
+function onFrame(fr) { trace.push(fr); if (trace.length > 900) trace.shift(); }
+function logResult(r, tag) {
+  $("outDecoded").textContent = r.ja;
+  const d = document.createElement("div"); d.innerHTML = `<span class="tag">${tag}</span><span class="mono">${r.code}</span> → ${r.ja}`;
+  $("log").prepend(d);
+}
+let stream = null, proc = null, dec = null, raf = null;
+$("btnMic").onclick = async () => {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+    const c = ctx(); const src = c.createMediaStreamSource(stream);
+    proc = c.createScriptProcessor(2048, 1, 1);
+    dec = new Decoder(c.sampleRate, r=>logResult(r,"マイク"), onFrame);
+    proc.onaudioprocess = e => dec.push(e.inputBuffer.getChannelData(0));
+    src.connect(proc); proc.connect(c.destination);
+    $("btnMic").disabled = true; $("btnStop").disabled = false; $("micState").textContent = "聞いています…";
+    const loop = () => { draw(); raf = requestAnimationFrame(loop); }; loop();
+  } catch(e) { $("micState").textContent = "マイクを使えません: " + e.message; }
+};
+$("btnStop").onclick = () => {
+  if (proc) { proc.disconnect(); proc = null; } if (stream) { stream.getTracks().forEach(t=>t.stop()); stream = null; }
+  if (raf) cancelAnimationFrame(raf); $("btnMic").disabled = false; $("btnStop").disabled = true; $("micState").textContent = "停止";
+};
+$("btnLoop").onclick = () => {
+  try {
+    const {buf, sr} = synthesize($("txtCode").value, +$("selTempo").value, +$("numGain").value, 44100);
+    trace.length = 0;
+    const d = new Decoder(sr, r=>logResult(r,"ループバック"), onFrame);
+    d.push(buf); d.flush(); draw();
+  } catch(e) { $("outDecoded").textContent = e.message; }
+};
+
+// 辞書表
+(function(){
+  const t = $("dict"); const rows = [["対象",DICT.target],["述語",DICT.pred],["補語",DICT.comp]];
+  let h = "<tr><th>種類</th><th>日本語</th><th>転写</th><th>試聴</th></tr>";
+  for (const [kind, items] of rows) for (const [ja, code] of items) h += `<tr><td>${kind}</td><td>${ja}</td><td class="mono">${code}</td><td><button class="secondary" data-code="${code}">▶</button></td></tr>`;
+  t.innerHTML = h;
+  t.querySelectorAll("button").forEach(b => b.onclick = () => { $("txtCode").value = b.dataset.code + " / K"; updateJa(); play(); });
+})();
+</script>
+</main>
+</body>
+</html>

@@ -10,6 +10,7 @@ header_pages:
   - design.md
   - plan.md
   - dataset.md
+  - language.md
   - progress.md
   - AI_Kosho_Rover_Project.md
 minima:
