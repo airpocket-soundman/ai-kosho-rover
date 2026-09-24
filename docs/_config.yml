@@ -1,0 +1,18 @@
+title: AI小姓ローバー 開発記録
+description: 人の行動を察して小物を先回りして届ける、家庭の玄関・廊下向けメカナムローバーの開発計画と進捗
+url: https://airpocket-soundman.github.io
+baseurl: /ai-kosho-rover
+lang: ja
+theme: minima
+show_excerpts: true
+header_pages:
+  - index.md
+  - design.md
+  - plan.md
+  - dataset.md
+  - progress.md
+  - AI_Kosho_Rover_Project.md
+minima:
+  date_format: "%Y-%m-%d"
+exclude:
+  - README.md

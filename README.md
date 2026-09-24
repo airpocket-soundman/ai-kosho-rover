@@ -2,7 +2,9 @@
 
 人の行動を観察し、次に必要になりそうな小物を少しだけ先回りして届ける、家庭の玄関・廊下向けメカナムローバーの開発プロジェクトです。
 
-現在は**企画・技術検証の段階**です。動作するローバーや実装済みのAIモデルはまだありません。構想の全文は[企画書](docs/AI_Kosho_Rover_Project.md)に保存しています。
+現在は**企画・詳細検討の段階**です。動作するローバーや実装済みのAIモデルはまだありません。構想の全文は[企画書](docs/AI_Kosho_Rover_Project.md)に保存しています。
+
+開発計画と進捗は GitHub Pages で公開しています: <https://airpocket-soundman.github.io/ai-kosho-rover/>
 
 ## 目指す体験
 
@@ -47,4 +49,11 @@ Decision ModelにはJEV系やLAYAを候補として検討します。Arduino UNO
 
 ## ドキュメント
 
+`docs/` 配下が GitHub Pages のソース(Jekyll、テーマは minima)です。Markdown を編集して `main` に push すると公開ページが更新されます。
+
 - [企画書（原文）](docs/AI_Kosho_Rover_Project.md)
+- [詳細検討](docs/design.md): 機体・電装・カメラ・自己位置・判断モデル・安全設計
+- [開発計画](docs/plan.md): フェーズ、完了条件、部品表、リスク
+- [データセット計画](docs/dataset.md): 下半身検出モデルの画像収集・ラベリング・学習
+- [進捗](docs/progress.md): マイルストーンと決定の記録
+- [進捗ログ](docs/_posts/): 日付ごとの記録(サイトのホームに一覧表示)

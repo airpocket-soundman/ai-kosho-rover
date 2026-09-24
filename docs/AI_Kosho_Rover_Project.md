@@ -1,3 +1,9 @@
+---
+layout: page
+title: 企画書(原文)
+permalink: /project/
+---
+
 # AI小姓ローバー（仮）企画書
 
 ## 1. コンセプト
