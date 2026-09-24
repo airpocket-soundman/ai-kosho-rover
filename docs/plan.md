@@ -38,7 +38,7 @@ Phase 8  まとめ          記録の整理、公開
 | 作業 | 内容 |
 | --- | --- |
 | フレーム | LEGO Technic で車台を組み、Geekservo ×4 とメカナムを取り付ける。LD06 を中段に置き、リフト板を支える柱を斜め 45° 方向に 4 本立てる。車高を確認 |
-| 待機位置 | 収納スペースに充電ステーションの場所を決め、手動で USB を挿す形で待機位置として使い始める |
+| 待機位置 | 収納スペースに充電ステーションの場所を決め、手動で USB を挿す形で待機位置として使い始める。UNO Q のアイドル消費を実測する |
 | 音 | 音声出力回路(DFPlayer Mini + スピーカー + BUSY 信号 + 圧電ブザー)を組み、MCU から曲番号と音量で再生。小姓語の WAV を microSD に入れる |
 | 電装 | モーターシールドの接続、電源の分離、電圧監視 |
 | MCU ファームウェア | メカナム運動学(vx, vy, ω → 4 輪 PWM)、ウォッチドッグ、速度上限 |
@@ -71,10 +71,10 @@ Phase 8  まとめ          記録の整理、公開
 | リフト | サーボ + 平行リンクでストローク 10〜15 mm。接触スイッチ。600 g の保持試験 |
 | ドッキング | 前方カメラで台の脚を検出し、横移動で芯合わせ、潜り込み、ToF で停止、リフト |
 | 搬送 | 収納スペース → 玄関 → 収納スペースの往復。荷物の落下がないこと |
-| 充電ステーション | V 字ガイドと接点を作り、後退で自動帰還して通電を確認。パススルー充電の動作確認 |
+| 充電ステーション | 送電パッド台座と側壁・奥壁を作り、ToF と受電電流で自己整列して充電を確認。パススルー充電の動作確認 |
 | ログ記録 | ドッキングの観測と指令を記録(模倣学習用) |
 
-完了条件: 台のドッキング成功率 9/10 以上、600 g 積載で廊下往復 10 回連続成功、充電ステーションへの自動帰還と通電 9/10 以上。
+完了条件: 台のドッキング成功率 9/10 以上、600 g 積載で廊下往復 10 回連続成功、充電ステーションへの自動帰還と受電開始 9/10 以上。
 
 ### Phase 4: 下半身検出モデル(10 月 〜 12 月、並行)
 
@@ -99,7 +99,7 @@ Phase 8  まとめ          記録の整理、公開
 | 扉の開閉 | リードスイッチ + 画像変化。開閉のログ |
 | 状態系列 | 「廊下 → 玄関接近 → 靴付近で停止 → しゃがむ → 扉付近で立つ」などの時系列を作り、状態テキストに変換 |
 | 生活パターン | 人ごとの外出・帰宅時刻をログに残し、平日 / 休日 × 30 分刻みで集計。初期値(平日朝は娘と父が外出、夕方に帰宅)は手入力 |
-| 常時監視 | MQTT ブローカーを PC に立て、扉・人物・ローバー状態を流す。ステーション上で 1 週間連続運転し、CPU 使用率・温度・Wi-Fi の切断回数を記録。監視を PC に移すかを決める |
+| 常時監視 | MQTT ブローカーを PC に立て、扉・人物・ローバー状態を流す。外部カメラの人物検出と扉の監視は PC で行い、ローバーは「出番」通知で起きる。ステーション上で 1 週間連続運転し、充電の収支・Wi-Fi の切断回数を記録 |
 
 完了条件: 1 週間のログで外出・帰宅のイベントを 9 割以上正しく時系列化できる。
 
@@ -135,29 +135,34 @@ Phase 8  まとめ          記録の整理、公開
 
 ## 部品表(案)
 
-| 分類 | 品名 | 数量 | 入手 | 備考 |
+購入先は Amazon.co.jp、AliExpress、秋月・千石・共立・スイッチサイエンス・マルツなどの国内電子部品店から選びます。国内で買えないものだけ海外店を示します。価格は 2026-09-24 時点の表示です。
+
+| 分類 | 品名 | 数量 | 購入先 / メーカー | 備考 |
 | --- | --- | --- | --- | --- |
-| 制御 | Arduino UNO Q(2 GB 版で可) | 1 | 国内代理店 | 4 GB 版なら機体側 LAYA の実験余地 |
-| 駆動 | Geekservo 9g DC モーター(赤) | 4 + 予備 1 | 国内 / 海外通販 | LEGO 互換 |
-| 駆動 | 60 mm LEGO 互換メカナムホイール(4 個セット) | 1 | 海外通販 | 左右 2 個ずつ |
-| 駆動 | Adafruit Motor Shield V2 互換 | 1 | 国内通販 | I2C 制御 |
-| リフト | Geekservo 2kg 270° サーボ | 1 | 国内 / 海外通販 | 9g 270° でも可 |
-| 自己位置 | LDROBOT LD06 | 1 | **手持ち** | UART 230400 |
-| 自己位置 | PAA5100JE 床面フローセンサー(Pimoroni PIM573) | 1 | Pimoroni 直販 / RobotShop / The Pi Hut | 秋月・スイッチサイエンスに取り扱いなし |
+| 制御 | Arduino UNO Q(2 GB / 16 GB) | 1 | [スイッチサイエンス](https://www.switch-science.com/products/10790)(¥9,900)。4 GB 版は[マルツ](https://www.marutsu.co.jp/pc/i/3680297/)(¥11,890)、[スイッチサイエンス](https://www.switch-science.com/products/10800)(¥13,200) | LAYA は PC 側なので 2 GB で可。[製品ドキュメント](https://docs.arduino.cc/hardware/uno-q) |
+| 駆動 | Geekservo 赤モーター(DC、LEGO 互換)4 個セット | 1 セット + 予備 | [Amazon.co.jp](https://www.amazon.co.jp/dp/B0B12MZQ9G)。[KittenBot(メーカー)](https://www.kittenbot.cc/products/kittenbot-red-geekservo-motor) | 出品により 70 rpm / 500 g·cm と 160 rpm / 700 g·cm の表記があり、現物で確認 |
+| 駆動 | 60 mm LEGO 互換メカナムホイール(左右 2 個ずつ、アルミ、Nexus 14159) | 1 セット | [AliExpress](https://www.aliexpress.com/item/32600309100.html)(約 $75)。[Nexus Robot(メーカー)](https://www.nexusrobot.com/product/a-set-of-60mm-lego-compatible-mecanum-wheels-4-piecesbearing-rollers-14144.html) | 予備案は [Thingiverse の 3D プリント版](https://www.thingiverse.com/thing:5245484/files) |
+| 駆動 | TB6612 ×2 + PCA9685 のモーターシールド(Adafruit Motor Shield V2 互換) | 1 | [Amazon.co.jp(HiLetgo)](https://www.amazon.co.jp/dp/B073SP76MC)。本家は [Adafruit](https://www.adafruit.com/product/1438) | I2C 制御。互換品は I2C プルアップが 5 V の場合があるので、UNO Q(3.3 V)との接続を確認 |
+| リフト | Geekservo 2kg サーボ(灰、位置制御) | 1 | [Amazon.co.jp で検索](https://www.amazon.co.jp/s?k=Geekservo+2kg+%E3%82%B5%E3%83%BC%E3%83%9C)。[KittenBot(メーカー)](https://www.kittenbot.cc/products/kittenbot-grey-geekservo-2kg-servo) | 360° 連続回転版と間違えない(位置制御版を選ぶ)。可動角は要確認 |
+| 自己位置 | LDROBOT LD06 | 1 | **手持ち**。[データシート(PDF)](https://www.inno-maker.com/wp-content/uploads/2020/11/LDROBOT_LD06_Datasheet.pdf) | UART 230400 |
+| 自己位置 | PAA5100JE 床面フローセンサー(Pimoroni PIM573) | 1 | [Pimoroni(メーカー直販)](https://shop.pimoroni.com/en-us/products/paa5100je-optical-tracking-spi-breakout) | 国内店・Amazon.co.jp・AliExpress に見当たらず、海外直販のみ |
 | 自己位置 | PMW3901 モジュール | 1 | [AliExpress](https://ja.aliexpress.com/item/1005009903523306.html)(購入先決定) | 先行実験用。上部搭載 + LED 追加が必要 |
-| 自己位置 | IMU(BNO055 等) | 1 | 秋月 / スイッチサイエンス | 必須 |
-| カメラ | ESP32-CAM(OV2640)+ 書き込み用アダプタ | 3 | 秋月 / Amazon.co.jp | 外部 A、外部 B、ローバー前方 |
-| センサー | VL53L1X ToF | 4 | 秋月 / スイッチサイエンス | Qwiic |
-| センサー | マイクロスイッチ | 5 | 秋月 | バンパー 4 + リフト 1 |
-| センサー | リードスイッチ + 磁石 | 1 | 秋月 | 玄関扉 |
-| 電源 | USB PD モバイルバッテリー(5 V 3 A 以上、2 口、パススルー充電対応) | 1 | 家電量販店 | 300 g 以下。非対応なら 2S Li-ion + 充電基板 |
-| 電源 | 電源スイッチ、配線、コネクタ(ZH1.5-4P を含む)、LD06 用 MOSFET スイッチ | 一式 | 秋月 | |
-| 充電 | ポゴピン + 受け側接点、ショットキーダイオード、USB 電源アダプター 5 V 3 A | 一式 | 秋月 / Amazon.co.jp | 充電ステーション用 |
-| 音 | DFPlayer Mini + microSD(FAT32)+ 小型スピーカー(8 Ω 3 W、口径 28〜40 mm) | 1 | 秋月 | 電子音の再生。詳細検討 5.5 節 |
-| 音 | 1 kΩ 抵抗、100 µF + 0.1 µF コンデンサ、圧電ブザー、NPN トランジスタ、100 Ω | 一式 | 秋月 | 音声出力回路の周辺部品 |
-| 音 | PAM8403 小型アンプ基板 | 1 | 秋月 / Amazon.co.jp | 音量不足時の代替(任意) |
-| 構造 | LEGO Technic ビーム・フレーム・ギア・軸 | 一式 | | 車台 + 台 4 台分。台は赤・青・黄で色分け |
-| サーバー | 自宅 PC(NVIDIA GPU) | 1 | **手持ち** | LAYA、学習 |
+| 自己位置 | BNO055 9 軸センサーフュージョンモジュール(AE-BNO055-BO) | 1 | [秋月電子](https://akizukidenshi.com/catalog/g/g116996/)(¥2,780) | 必須。ヨー角 |
+| カメラ | ESP32-CAM(AI-Thinker、OV2640)+ 書き込み用アダプタ | 3 | [Amazon.co.jp で検索](https://www.amazon.co.jp/s?k=ESP32-CAM) | 代替は [XIAO ESP32S3 Sense(Seeed)](https://www.seeedstudio.com/XIAO-ESP32S3-Sense-p-5639.html) |
+| センサー | VL53L1X ToF モジュール(AE-VL53L1X) | 4 | [秋月電子](https://akizukidenshi.com/catalog/g/g114249/)(¥1,320) | 近接停止、充電時の壁との距離 |
+| センサー | INA219 電流センサーモジュール | 1 | [秋月電子](https://akizukidenshi.com/catalog/g/g108221/)、[共立エレショップ](https://eleshop.jp/shop/g/gJAN121/)、[Amazon.co.jp](https://www.amazon.co.jp/dp/B08KGHYHXX) | 受電電流の監視(充電位置の自己整列) |
+| センサー | マイクロスイッチ | 5 | [秋月電子で検索](https://akizukidenshi.com/catalog/goods/search.aspx?keyword=%E3%83%9E%E3%82%A4%E3%82%AF%E3%83%AD%E3%82%B9%E3%82%A4%E3%83%83%E3%83%81) | バンパー 4 + リフト 1 |
+| センサー | ドアセンサースイッチ SPS-320N(リードスイッチ + 磁石) | 1 | [秋月電子](https://akizukidenshi.com/catalog/g/g113371/)(¥400) | 玄関扉 |
+| 充電 | 無線給電ユニット(候補 A〜E から Phase 3 で決定。詳細検討 9.1 節) | 1 | 候補 A [千石電商](https://www.sengoku.co.jp/mod/sgk_cart/detail.php?code=EEHD-4LBF)、B [共立エレショップ](https://eleshop.jp/shop/g/gD6M114/)、C [Amazon.co.jp(Taidacent)](https://www.amazon.co.jp/dp/B086QZCC9L)、D [Amazon.co.jp(Qi 15 W 送電)](https://www.amazon.co.jp/dp/B0GF5ZHVVV)、E [Amazon.co.jp(Qi 3 コイル 5 V 2 A)](https://www.amazon.co.jp/dp/B09G3LV51Q) | まず A を購入して実測。位置ずれや出力が足りなければ C か Qi 系へ |
+| 充電 | 送電側の電源アダプター(候補に合わせて 5 V 2 A、12 V、または 24 V) | 1 | 家電量販店 / [秋月電子](https://akizukidenshi.com/) | |
+| 電源 | パススルー充電対応モバイルバッテリー(5 V 3 A 出力、2 口、300 g 以下) | 1 | 未選定(Amazon.co.jp) | 1 A 入力でも充電できる製品を現物で確認。代替は 1S Li-ion + TP4056(1 A)+ 5 V 3 A 昇圧 |
+| 電源 | 電源スイッチ、配線、ZH1.5-4P コネクタ、LD06 用 Pch MOSFET | 一式 | [秋月電子](https://akizukidenshi.com/) | |
+| 音 | DFPlayer mini(DFR0299) | 1 | [秋月電子](https://akizukidenshi.com/catalog/g/g112544/)(¥1,280) | 小姓語の再生。詳細検討 5.5 節 |
+| 音 | 小型スピーカー 8 Ω 2〜3 W(口径 28〜40 mm)、microSD(FAT32) | 1 | [秋月電子で検索](https://akizukidenshi.com/catalog/goods/search.aspx?keyword=%E3%82%B9%E3%83%94%E3%83%BC%E3%82%AB%E3%83%BC) | |
+| 音 | 1 kΩ 抵抗、100 µF + 0.1 µF、圧電ブザー、NPN トランジスタ、100 Ω | 一式 | [秋月電子](https://akizukidenshi.com/) | 音声出力回路の周辺部品 |
+| 音 | PAM8403 D 級アンプモジュールキット(AE-PAM8403-AMP) | 1 | [秋月電子](https://akizukidenshi.com/catalog/g/g115698/)(¥750) | 音量不足時の代替(任意) |
+| 構造 | LEGO Technic ビーム・フレーム・ギア・軸 | 一式 | [LEGO Pick a Brick](https://www.lego.com/ja-jp/pick-and-build/pick-a-brick) | 車台 + 台 4 台分。台は赤・青・黄で色分け |
+| サーバー | 自宅 PC(NVIDIA GPU) | 1 | **手持ち** | LAYA、学習、待機中の監視 |
 
 ## リスクと対策
 
@@ -167,7 +172,9 @@ Phase 8  まとめ          記録の整理、公開
 | 廊下で自己位置が曖昧 | ウェイポイントを外す | 地図に扉枠や下駄箱を入れる。フロー + IMU で補う。見失ったら停止 |
 | 柱の死角と低い走査面 | 位置推定の精度低下 | 柱を斜め方向に置きマスク処理。走査面の高さで地図を作る |
 | LD06 の寿命(10,000 時間) | 常時稼働で 1 年強 | 待機中は電源を切る |
-| 常時監視の発熱・Wi-Fi 断 | 監視の停止 | 待機中はフレームレートを下げ、自動再接続。必要なら監視を PC に移す |
+| 無線給電の出力不足(5 W) | 充電が進まない | 待機中の監視は PC、ローバーはアイドル(2〜2.5 W 見込み、要実測)。不足なら送受電セットを 2 組に |
+| 無線給電の位置ずれ | 受電できない | ToF で壁との距離を合わせ、受電電流が最大になる位置を探す |
+| 常時監視の Wi-Fi 断 | 監視の停止 | 監視は PC 側。ローバーは自動再接続 |
 | フローセンサーの入手遅れ | Phase 2 の遅延 | Amazon の PMW3901 で先に実験し、到着後に載せ替える。同じドライバで動く |
 | ESP32-CAM の遅延・コマ落ち | 認識の遅れ | 位置制御はカメラに依存しない設計。専用 SSID。必要なら ESP32-S3 |
 | サーバー停止・通信断 | 判断が止まる | 500 ms / 5 秒のフォールバック。安全停止と自己位置は機体側で完結 |
